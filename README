@@ -23,3 +23,4 @@ Params: Each pattern/preset takes 0-4 parameters. These bytes are how we set tho
   Patterns and presets are unaware of parameter bytes they do not use.
 Checksum: The checksum is the floored average of the first eight bytes of the message.
 
+The files other than the python file are lcf files, or rather luma config files. Nothing all that special.
