@@ -1,0 +1,25 @@
+Text client for my led control project LUMA.
+It is state-based in the sense that the menu the program displays
+is determined by the value of a single value (in this case "state")
+and the code within each state is responsible for changing this variable
+in order to change to the next desired screen.
+
+The message that it sends to the server is formatted as follows:
+[153] [bank] [channel] [pattern] [param 1] [param 2] [param 3] [param 4] [checksum]
+
+Continuity byte: The first byte is set to 153 in an attempt to detect and prevent 
+  bitshifted mutations during transmission. 
+Bank: The second-the bank byte-is used to tell the server first which connected controller
+  to use, then furthermore which set of PWM pins to use. Each controller can control
+  two independent sets of lights.
+Channel: The channel byte tells the server and later the controller which channel the user
+  is editing. 0-2 correspond to the RGB channels, and when one of them are edited
+  they are modified independently of the other two. However if we send a channel byte of
+  3 we edit the preset channel, which means the pattern byte no longer specifies the pattern
+  of a single channel, but a preset that controls all three of the specified bank.
+Pattern: The pattern byte controls the pattern of the specified channel. Note above the behaviour
+  when controlling the preset channel.
+Params: Each pattern/preset takes 0-4 parameters. These bytes are how we set those parameters.
+  Patterns and presets are unaware of parameter bytes they do not use.
+Checksum: The checksum is the floored average of the first eight bytes of the message.
+
