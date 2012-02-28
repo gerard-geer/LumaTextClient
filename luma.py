@@ -2,9 +2,11 @@
 import sys
 #SOCKETS!!
 import socket
+#For various quirks.
+import os
 
 class Luma(object):
-  """
+	"""
 		This is a script for writing commands to luma through
 		a means that is not a super pretty java applet.
 		SLOTS:
@@ -64,15 +66,15 @@ class Luma(object):
 		#Initialize finished to be False.
 		self.finish = False
 	
-	#85 newlines.
-	def clearScreen(self):
-		for i in range(85):
-			print("\n")
-			
 	#Ten newlines.
 	def bumpUp(self):
-		for i in range(10):
+		for i in range(5):
 			print("\n")
+	
+	#85 newlines.NOT.
+	def clearScreen(self):
+		os.system('cls' if os.name == 'nt' else 'clear')
+		#self.bumpUp()
 	
 	#Returns whether execution of the menu code is done. Shouldn't ever be,
 	#The program is exited from within the menu code.
@@ -173,6 +175,7 @@ class Luma(object):
 		elif self.state == 2:
 			try:
 				self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				self.s.settimeout(3)
 				self.s.connect((self.chosenPlace.getAddress(), self.port))
 				self.clearScreen()
 				# input("***********************************\n"+ \
@@ -556,6 +559,7 @@ class LumaSetting(object):
 								currentInput = None
 								properInput = False 
 								try:
+									#(x/y) name: 
 									currentInput = input("("+str(i+1)+"/"+str(len(self.params))+") "+str(self.params[i])+": ")
 								except:
 									print("\nkeyboard exit. Goodbye.")
@@ -615,4 +619,3 @@ def main():
 		script.handle()
 		
 main()
-
