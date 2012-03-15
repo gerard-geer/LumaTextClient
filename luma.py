@@ -74,7 +74,7 @@ class Luma(object):
 	#85 newlines.NOT.
 	def clearScreen(self):
 		os.system('cls' if os.name == 'nt' else 'clear')
-		#self.bumpUp()
+		self.bumpUp()
 	
 	#Returns whether execution of the menu code is done. Shouldn't ever be,
 	#The program is exited from within the menu code.
@@ -619,3 +619,4 @@ def main():
 		script.handle()
 		
 main()
+
