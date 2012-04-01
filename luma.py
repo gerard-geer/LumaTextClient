@@ -20,11 +20,19 @@ class Luma(object):
 		port:         The port to connect to.
 		s:            Our socket.
 		finished:     Boolean of whether or not we've finished executing the dialog.
+		
+		variousStates:Dedicated values representing menu states.
 	"""
 	__slots__ = ("places", "chans", "patterns", "presets", "chosenPlace", "chosenChan", \
-				"chosenPat", "chosenParams", "state", "port", "s", "finish")
+				"chosenPat", "chosenParams", "state", "port", "s", "finish"
+				"mmState", "verifState", "sCreateState", "chanState", "prSelectState", "paSelectState", "confirmState" )
 	
 	def __init__(self, placeFile, patternNamesFile, presetNamesFile):
+	"""
+	Initializes the Luma object.
+	Loads all the data stored in the config files and populates all the patterns,
+	channels, presets, and places.
+	"""
 		#Load the potential places from file.
 		self.places = []
 		placeList = open(placeFile)
@@ -60,11 +68,20 @@ class Luma(object):
 			self.presets.append(LumaSetting(name, value, [], True))
 
 		#Initialize state to 0 so that the program starts at the intended menu.
-		self.state = 0
+		self.state = self.mmState
 		#Initialize port to 1535
 		self.port = 1535
 		#Initialize finished to be False.
 		self.finish = False
+		
+		#Initialize state values.
+		self.mmState = 0
+		self.verifState = 1
+		self.sCreateState = 2
+		self.chanState = 3
+		self.prSelectState = 4
+		self.paSelectState = 5
+		self.confirmState = 10
 	
 	def bumpUp(self):
 	"""
@@ -72,6 +89,7 @@ class Luma(object):
 	"""
 		for i in range(5):
 			print("\n")
+			
 	
 	def clearScreen(self):
 	"""
@@ -88,19 +106,102 @@ class Luma(object):
 	since the program is exited from within the menu code.
 	"""
 		return self.finish
+		
 	
-	def killSocket(self):
+	def killSocket(self, stateToGoTo):
+	"""
+	Kills the client's socket. The script should return to a 
+	state prior to socket creation.
+	"""
+		try:
+			#Clear the screen.
+			self.clearScreen()
+			#Print the alert that the connection is closing.
+			print("***************************")
+			print("<   Closing connection.   >")
+			print("***************************")
+			
+			#Alert that the socket is being shut down.
+			print("...shutting down.")
+			#closes down both read(RD) and write(WR) streams.
+			self.s.shutdown(socket.SHUT_RDWR)
+			
+			#Alert that the socket is being closed.
+			print("...closing.")
+			#Closes, and defocuses the socket instance.
+			self.s.close()
+			
+			#Alert that the procedure has been completed.
+			print("...completed.")
+			
+			#Go to the state specified.
+			self.state = stateToGoTo
+		
+		#If anything goes wrong above, it will be due to the closing
+		#of the socket. Since shutdown is data-safe, it will be because
+		#the socket was never connected.
+		except:
+			#Print the notification.
+			print("\n\n")
+			print("***************************")
+			print("<  Error disconnecting:   >")
+			print("<  Socket already dead.   >")
+			print("<  Press enter...         >")
+			print("***************************")
+			try:
+				#Make the user press enter so we know he knows.
+				input("")
+			except:
+				#Still have to catch the keyboard exit.
+				print("\nkeyboard exit. Goodbye.")
+				sys.exit(0)
+		finally:
+			#No matter what, we must go to the specified state.
+			self.state = stateToGoTo;
+	
+	def handle(self):
+	"""
+	The main functionality of the program.
+	"""
+		#Main menu.
+		if self.state == self.mmState:
+			mainMenu()
+
+		#Verification.
+		elif self.state == self.verifState:
+			verifScreen()
+		
+		#The creation of the socket.
+		elif self.state == self.sCreateState:
+			createSocket()
+				
+		
+		#Channel selection.
+		elif self.state == self.chanState:
+			selectChannel()
+		
+		#Preset selection.
+		elif self.state == self.prSelectState:
+			selectPreset()
+			
+		#Pattern selection.
+		elif self.state == self.paSelectState:
+			selectPattern()
+		
+		#Confirms selection.
+		elif self.state == self.confirmState:
+			confirmation()
 	
 	
 	def mainMenu(self):
-		"""
-			This handles the dialog and input for the main menu.
-			The input algorithm here is used in every menu besides the
-			parameter input dialog. It takes no inputs. It is at this screen
-			that we choose a Location, which encapsulates the bank byte,
-			server name, and server address. At the next screen we verify
-			this choice.
-		"""
+	"""
+	This handles the dialog and input for the main menu.
+	The input algorithm here is used in every menu besides the
+	parameter input dialog. It takes no inputs. It is at this screen
+	that we choose a Location, which encapsulates the bank byte,
+	server name, and server address. At the next screen we verify
+	this choice.
+	"""
 		
 		#Try for some proper input...
 		properInput = False
@@ -171,20 +272,21 @@ class Luma(object):
 		else:
 			#						places is a list of Places
 			self.chosenPlace = self.places[chosenIndex]
-			self.state = 1
+			self.state = self.mmState
+			
 	
 	def verifScreen(self):
-		"""
-		The verification screen exists to allow users to check their selection before
-		connecting to it. On CSH-Net this may be seen as a hindrance since on a lan
-		these connections are made so fast. However, when connecting from afar, these
-		connections may take several seconds to establish.
-		Having to read five lines of text, though it might take longer than the connection
-		time, is more stimulating (thus less agrivating) than waiting for the connection
-		to time out, or successfully connect and then having to disconnect.
-		This screen too takes no inputs. It is here that the Place is finalized, and at
-		the next screen the connection is actually established.
-		"""
+	"""
+	The verification screen exists to allow users to check their selection before
+	connecting to it. On CSH-Net this may be seen as a hindrance since on a lan
+	these connections are made so fast. However, when connecting from afar, these
+	connections may take several seconds to establish.
+	Having to read five lines of text, though it might take longer than the connection
+	time, is more stimulating (thus less agrivating) than waiting for the connection
+	to time out, or successfully connect and then having to disconnect.
+	This screen too takes no inputs. It is here that the Place is finalized, and at
+	the next screen the connection is actually established.
+	"""
 		#Try for some proper input.
 		properInput = False
 		choice = None
@@ -238,10 +340,11 @@ class Luma(object):
 		
 		#If the choice is 1, go to the Socket Creation stage,
 		if choice == 1:
-			self.state = 2
+			self.state = self.sCreateState
 		#Otherwise, go back to the main menu.
 		else:
-			self.state = 0
+			self.state = self.mmState
+			
 			
 	def createSocket(self):
 	"""
@@ -272,7 +375,7 @@ class Luma(object):
 			# self.clearScreen()
 			
 			#If all this is successful, go to the channel select screen.
-			self.state = 3
+			self.state = self.chanState
 		
 		#And if any of it fails...
 		except:
@@ -294,7 +397,8 @@ class Luma(object):
 			#Penultimately clear the screen...
 			self.clearScreen()
 			#and return to the main menu.
-			self.state = 0
+			self.state = self.mmState
+			
 			
 	def selectChannel(self):
 	"""
@@ -360,16 +464,17 @@ class Luma(object):
 				
 		#If the chosen channel is the preset channel, go to the presets screen.
 		if self.chosenChan == 3:
-			self.state = 4
+			self.state = self.prSelectState
 		#If the state is the back state, we have to kill the socket before returning
 		#to the main menu.
 		elif self.chosenChan == 4:
 			#Have to kill the socket.
-			self.state = 50
+			self.state = self.paSelectState0
 		#If the chosen channel is not the preset channel, or back, we go to the 
 		#pattern select screen.
 		else:
-			self.state = 5
+			self.state = self.paSelectState
+			
 	
 	def selectPreset(self):
 	"""
@@ -447,12 +552,12 @@ class Luma(object):
 		#If the chosen pat was the first "OTHER OPTION",
 		if self.chosenPat == len(self.presets):
 			#go back to the channel selection screen.
-			self.state = 3
+			self.state = self.chanState
 		#If the chosen pat was the other extra option,
 		elif self.chosenPat == len(self.presets)+1:
 			#Go to a state that clears out the current socket collection,
 			#then returns to the main menu.
-			self.state = 50
+			self.state = self.paSelectState0
 			#Add better socket closing code.
 			
 		#If the input was for an actual pattern, 
@@ -462,7 +567,8 @@ class Luma(object):
 			#    param list     list of pattern objects      input dialog member
 			self.chosenParams = self.presets[self.chosenPat].inputParameters()
 			#Afterwards, go to a confirmation state.
-			self.state = 10
+			self.state = self.confirmState
+			
 	
 	def selectPattern(self):
 	"""
@@ -528,12 +634,12 @@ class Luma(object):
 		#If the chosen pat is the first auxillary appended choice,
 		if self.chosenPat == len(self.patterns):
 			#go back to the channel selection screen.
-			self.state = 3
+			self.state = self.chanState
 		#If the chosen pat is the second auxillary appended choice,
 		elif self.chosenPat == len(self.patterns)+1:
 			#go to a state that clears out the current socket collection,
 			#then returns to the main menu.
-			self.state = 50
+			self.state = self.paSelectState0
 			#Better socket kill code.
 		#Otherwise the input was that of an actual pattern.
 		else:
@@ -542,133 +648,198 @@ class Luma(object):
 			self.clearScreen()
 			self.chosenParams = self.patterns[self.chosenPat].inputParameters()
 			#Afterwards, go to a confirmation state.
-			self.state = 10
-		
+			self.state = self.confirmState
 	
-	#The main functionality of the program.
-	def handle(self):
-		#Main menu.
-		if self.state == 0:
-			mainMenu()
 
-		#Verification.
-		elif self.state == 1:
-			verifScreen()
+	def confirmation(self):
+	"""
+	This displays a confirmation dialog, constructs the message, and then transmits it.
+	"""
+		#Proper input.
+		properInput = False
 		
-		#The creation of the socket.
-		elif self.state == 2:
-			createSocket()
-				
+		#Sincerity is a boolean representing that of the user.
+		sincerity = None
 		
-		#Channel selection.
-		elif self.state == 3:
-			selectChannel()
+		#Stores the name of the chosen LumaSetting object for user review.
+		settingName = None
 		
-		#Preset selection.
-		elif self.state == 4:
-			selectPreset()
+		#Similarly stores the list of parameter names for user review.
+		pNames = []
+		
+		#And yet further we store the selected values of those parameters--for review, of course.
+		pVals = []
+		
+		#If the chosen channel was the preset channel, populate the review variables as such.
+		if self.chosenChan == 3:
+			#Create setting info if it is a preset.
+			settingName = "Preset{ " + str(self.presets[self.chosenPat].getName()) + " ("+str(self.chosenPat) +")"
+			pNames = self.presets[self.chosenPat].getParamNameList()
+			pVals  = self.presets[self.chosenPat].getParamValList()
 			
-		#Pattern selection.
-		elif self.state == 5:
-			selectPattern()
+		#Likewise, if the chosen channel was the preset channel, populate the reiview variables as such.
+		else:
+			#Create setting info if it is a pattern.
+			settingName = "Pattern{ " + str(self.patterns[self.chosenPat].getName()) + " ("+str(self.chosenPat) +")"
+			pNames = self.patterns[self.chosenPat].getParamNameList()
+			pVals  = self.patterns[self.chosenPat].getParamValList()
 		
-		#Confirms selection.
-		elif self.state == 10:
-			#Proper input.
-			properInput = False
-			sincerity = None
-			settingName = None
-			pNames = []
-			pVals = []
-			if self.chosenChan == 3:
-				#Create setting info if it is a preset.
-				settingName = "Preset{ " + str(self.presets[self.chosenPat].getName()) + " ("+str(self.chosenPat) +")"
-				pNames = self.presets[self.chosenPat].getParamNameList()
-				pVals  = self.presets[self.chosenPat].getParamValList()
-			else:
-				#Create setting info if it is a pattern.
-				settingName = "Pattern{ " + str(self.patterns[self.chosenPat].getName()) + " ("+str(self.chosenPat) +")"
-				pNames = self.patterns[self.chosenPat].getParamNameList()
-				pVals  = self.patterns[self.chosenPat].getParamValList()
-			while not properInput:
-				self.clearScreen()	
-				print("===================================")
-				print("| Are you sure of your update?    |")
-				print("| I hope you aren't going to be   |")
-				print("| a dick to epilleptics...        |")
-				print("|=T================================")
-				print("| |Server: "+str(self.chosenPlace.getName()))
-				print("| |Bank: "+str(self.chosenPlace.getBankName()))
-				print("| |Channel: "+str(self.chans[self.chosenChan]))
-				print("| |"+str(settingName))
-				for i in range(len(pNames)):
-					print("| |"+str(pNames[i])+"{ "+str(pVals[i]))
-				print("==^================================")
+		#While the user-entered input is not valid,
+		while not properInput:
+		
+			#Clear the screen...
+			self.clearScreen()
+			#Print an epillepsy warning, and a verification message.
+			print("===================================")
+			print("| Are you sure of your update?    |")
+			print("| I hope you aren't going to be   |")
+			print("| a dick to epilleptics...        |")
+			print("|=T================================")
+			#Below the warning and message we post the choices the user has
+			#made so that they may review them.
+			#Server name:
+			print("| |Server: "+str(self.chosenPlace.getName()))
+			#Bank name:
+			print("| |Bank: "+str(self.chosenPlace.getBankName()))
+			#Channel name:
+			print("| |Channel: "+str(self.chans[self.chosenChan]))
+			#Pattern/Preset name:
+			print("| |Setting: "+str(settingName))
+			
+			#Now in a loop we print out the parameter names along
+			#with their respective values.
+			for i in range(len(pNames)):
+				print("| |"+str(pNames[i])+"{ "+str(pVals[i]))
+			
+			#Footing serif.
+			print("|=^==OPTIONS=======================")
+			print("| 0: SUBMIT                       |")
+			print("| 1: Go to Location/Main Menu     |")
+			print("| 2: Go to Channel Menu           |")
+			print("| 3: Go to Pattern/Preset Menu    |")
+			print("| 4: Exit the client              |")
+			print("===================================")
+			#Try to garner verification input.
+			try:
+				#Give the user a prompt to base their input off of.
+				enteredInput = input("| YES=1 NO=0 =============> ")
+			except:
+				#We still have to check for keyboard exiting.
+				print("\nkeyboard exit. Goodbye.")
+				#Kill the socket. Though we say we're going to
+				#the main screen, we never do since we immediately exit.
+				self.killSocket(self.mmState)
+				sys.exit(0)
+			
+			#Try to get an answer from the user.
+			try:
+				#Attempt to convert their input to a number.
+				sincerity = int(enteredInput)
+				#If its a number, but not a choice, raise an error.
+				if sincerity < 0 or sincerity > 4:
+					raise ValueError
+				#Otherwise, the input was valid.
+				else:
+					#Flag the input loop not to repeat.
+					properInput = True
+			
+			#If an error was raised above, it was because of invalid input.
+			except:
+				#clear the screen so we merely see this prompt.
+				self.clearScreen()
 				try:
-					enteredInput = input("| YES=1 NO=0 =============> ")
+					input("***********************************\n"+ \
+					"* Invalid choice. Press enter...  *\n"+ \
+					"***********************************")
 				except:
+					#Here again we must check for keyboard input.
 					print("\nkeyboard exit. Goodbye.")
+					#And also we must kill the socket.
+					self.killSocket(self.mmState)
 					sys.exit(0)
-				try:
-					sincerity = int(enteredInput)
-					if sincerity < 0 or sincerity > 1:
-						raise ValueError
-					else:
-						properInput = True
-				except:
-					self.clearScreen()
-					try:
-						input("***********************************\n"+ \
-						"* Invalid choice. Press enter...  *\n"+ \
-						"***********************************")
-					except:
-						print("\nkeyboard exit. Goodbye.")
-						sys.exit(0)
-					self.clearScreen()
-			if sincerity == 1:
-				#Calculate the checksum. It's the integer-divided average of
-				#the first 8 bytes of the message.
-				checksum = (153 + int(self.chosenPlace.getBank()) + int(self.chosenChan) + int(self.chosenPat) + int(pVals[0]) + int(pVals[1]) + int(pVals[2]) + int(pVals[3]))//8
-							
-				#Write to the socket.
-				b = bytearray(9) #Create a byte array.
-				b[0] = 153
-				b[1] = self.chosenPlace.getBank()
-				b[2] = self.chosenChan
-				b[3] = self.chosenPat
-				b[4] = int(pVals[0])
-				b[5] = int(pVals[1])
-				b[6] = int(pVals[2])
-				b[7] = int(pVals[3])
-				b[8] = checksum
-				try:
-					self.s.sendall(b)
-					self.state = 50
-				except:
-					self.clearScreen()
-					try:
-						input("************************************\n"+ \
-						"*    Transmission unsuccessful.   *\n"+ \
-						"*          Press enter...         *\n"+ \
-						"***********************************")
-					except:
-						print("\nkeyboard exit. Goodbye.")
-						sys.exit(0)
-					self.clearScreen()
-					self.state = 50
-					
-			else:
-				self.state = 50
+				
+				#Clear the screen of the prompt after it has been passed.
+				self.clearScreen()
+				
+		if sincerity == 0:
+			#Calculate the checksum. It's the integer-divided average of
+			#the first 8 bytes of the message.
+			checksum = (153 + int(self.chosenPlace.getBank()) + int(self.chosenChan) + int(self.chosenPat) + int(pVals[0]) + int(pVals[1]) + int(pVals[2]) + int(pVals[3]))//8
+						
+			#Write to the socket.
+			b = bytearray(9) #Create a byte array for the message.
+			b[0] = 153							#Continuity byte.
+			b[1] = self.chosenPlace.getBank()	#Bank byte.
+			b[2] = self.chosenChan				#Channel byte.
+			b[3] = self.chosenPat				#Pattern/Preset byte.
+			b[4] = int(pVals[0])				#Parameter byte A.
+			b[5] = int(pVals[1])				#Parameter byte B.
+			b[6] = int(pVals[2])				#Parameter byte C.
+			b[7] = int(pVals[3])				#Parameter byte D.
+			b[8] = checksum						#Checksum byte.
 			
-		#Socket smoke stack.
-		elif self.state == 50:
-			killSocket();
+			#Attempt to send the data.
+			try:
+				#Send the data...
+				self.s.sendall(b)
+				#And kill the socket.
+				self.killSocket(self.mmState)
+			#If the transmission was unsuccessful...
+			except:
+				#Clear the screen...
+				self.clearScreen()
+				#Tell the user of the problem, and make them press enter to continue.
+				try:
+					input("************************************\n"+ \
+					"*    Transmission unsuccessful.   *\n"+ \
+					"*          Press enter...         *\n"+ \
+					"***********************************")
+				except:
+					#YET AGAIN test for keyboard exiting.
+					print("\nkeyboard exit. Goodbye.")
+					self.killSocket(self.mmState)
+					sys.exit(0)
 				
-				
-				
-				
-				
-				
+				#If the transmission was unsuccesful, we clear the screen of the above prompt,
+				self.clearScreen()
+				#And kill the socket, returning to the main screen.
+				self.killSocket(self.mmState);
+		
+		#If the user did not want to send their selection,
+		else:
+		
+			#To return to the main menu we must kill the socket,
+			#so we simply tell the socket kill routine to return us to state 0.
+			if sincerity = 1:
+				self.killSocket(self.mmState)
+			
+			#To return to the channel selection screen, we must simply set
+			#the state to 3.
+			if sincerity = 2:
+				self.state = self.chanState
+			
+			#To return to the preset/pattern selection screen, we...
+			if sincerity = 3:
+				#must take into account the chosen pattern.
+				if chosenChan == 3:
+					#Go to the preset screen.
+					self.state = self.prSelectState
+				else
+					#Go to the pattern screen.
+					self.state = self.paSelectState
+			
+			#If the sincerity choice is 4, we must exit.
+			if sincerity = 4:
+				self.killSocket(self.mmState)
+				sys.exit(0)
+			
+			#we kill the socket and return to the main menu.
+			self.killSocket(self.mmState)
+			
+	
+	
+
+
 				
 class Place(object):
 	"""
@@ -684,25 +855,41 @@ class Place(object):
 	__slots__ = ("address", "name", "bank", "bankName")
 	
 	def __init__(self, address, name, bank, bankName):
+	"""
+	Initializes this place object.
+	"""
 		self.address = address
 		self.name = name
 		self.bank = bank
 		self.bankName = bankName
+		
 	
 	def __str__(self):
+	"""
+	Returns a string representation of the data this Place object is encapsulating.
+	"""
 		toReturn = str(str(self.bankName)+ "\n|\t@"+str(self.name)+" ("+str(self.address)+")")
 		return toReturn
+		
 	
-	#Returns the address of this Place object.
 	def getAddress(self):
+	"""
+	Returns the address of this Place object.
+	"""
 		return self.address
+		
 	
-	#Returns the name of this Place object.
 	def getName(self):
+	"""
+	Returns the name of this Place object.
+	"""
 		return self.name
+		
 	
-	#Returns the chosen bank value of this Place object.
 	def getBank(self):
+	"""
+	Returns the bank value of this Place object.
+	"""
 		return self.bank
 	
 	def getBankName(self):
@@ -713,20 +900,27 @@ class LumaSetting(object):
 	"""
 		This encapsulates the input of a single pattern (OR PRESET)
 		SLOTS:
-		params:       List of parameter names.
-		paramvals:    List of inputed values. This is the eventual
-					  contents of parambytes 1-4, so for every param
-                      byte without a parameter input we will store a zero.
-		paramsfilled: boolean representing if we have gotten the 
-					  parameters from the user.
-		preset:		  boolean signalling if this is infact a preset as
-					  opposed to a pattern.
-		value:        numerical representation of the pattern.
+		params:       	List of parameter names.
+		
+		paramvals:	List of inputed values. This is the eventual
+				contents of parambytes 1-4, so for every param
+                      		byte without a parameter input we will store a zero.
+                      		
+		paramsfilled: 	Boolean representing if we have gotten the 
+				parameters from the user.
+				
+		preset:		Boolean signalling if this is infact a preset as
+				opposed to a pattern.
+				
+		value:        	numerical representation of the pattern.
 	"""
 
 	__slots__ = ("params", "name", "value", "paramVals", "paramsfilled", "preset")
 
 	def __init__(self, name, value, params, preset):
+	"""
+	Initializes this LumaSetting object.
+	"""
 		self.name = name
 		#To avoid having a parameter with a new line, we create an extra, and remove it.
 		self.params = params[:-1]
@@ -737,49 +931,85 @@ class LumaSetting(object):
 
 	
 	def __str__(self):
+	"""
+	When we want to print out data about this LumaSetting, we only want its name.
+	"""
 		return str(self.name)
+		
 	
 	#Localized script to read in the parameters of this pattern.
 	def inputParameters(self):
+	"""
+	In this routine we read in the parameters of this LumaSetting.
+	
+	If this LumaSetting has less than four parameters, after we
+	finish getting the few parameters we do need, we fill the rest
+	of the four slots with zeros.
+	
+	Remember that the extra parameters will ultimately be ignored.
+	"""
+		
+		#If this LumaSetting is not flagged as a preset, we go through
+		#and get input for each of its parameters.
 		if not self.preset:
+			
+			#Print a header for the loop.
 			print("==================================")
 			print("| Enter the parameters of your   |")
 			print("| selected pattern.              |")
 			print("| Values must range from 0-255   |")
 			print("==================================")
+			
+			#We cycle through each of the four parameter slots.
+			#If there is not a parameter that is required for
+			#the current slot, we simply place in a zero,
+			#as stated above.
 			for i in range(4):
 				
-				if not self.preset:
-					#Try to gliss in a parameter value...
-					try:
-						properInput = False
-						currentInput = None
-						while not properInput:
+				#Try to gliss in a parameter value...
+				try:
+					properInput = False
+					currentInput = None
+					
+					#While the input is not verified as acceptable, we repeat the prompt.
+					while not properInput:
+					
+						try:
+							#Clear the value to store the input for the current parameter.
+							currentInput = None
+							#mark the input as false, since it has not been entered yet.
+							properInput = False 
+							
+							#Get the input for this current parameter with a formatted prompt.
+							#Here we also account for keyboard exiting.
 							try:
-								currentInput = None
-								properInput = False 
-								try:
-									#(x/y) name: 
-									currentInput = input("("+str(i+1)+"/"+str(len(self.params))+") "+str(self.params[i])+": ")
-								except:
-									print("\nkeyboard exit. Goodbye.")
-									sys.exit(0)
-									
-								enteredInput = int(currentInput)
-								#We're packing this into a single character, so we need max min verif.
-								if enteredInput < 0 or enteredInput > 255:
-									raise ValueError
-								properInput = True
-							except ValueError:
-								print("Improper input. Please enter a value between 0 and 255")
-						#Add the input to paramValues.		
-						self.paramVals.append(currentInput)
+								#(x/y) name: 
+								currentInput = input("("+str(i+1)+"/"+str(len(self.params))+") "+str(self.params[i])+": ")
+							except:
+								print("\nkeyboard exit. Goodbye.")
+								sys.exit(0)
+							
+							#Try to convert the input to an int.
+							enteredInput = int(currentInput)
+							#We're packing this into a single character(byte), so we need max min verif.
+							if enteredInput < 0 or enteredInput > 255:
+								raise ValueError
+							properInput = True
 						
-					#...but if we've already gone through all the params
-					#add merely a zero.
-					except IndexError:
-						self.paramVals.append(0)
+						#If an error occurs above, it is due to the input being invalid.
+						except ValueError:
+							print("Improper input. Please enter a value between 0 and 255")
+							
+					#Add the input to paramValues.		
+					self.paramVals.append(currentInput)
+					
+				#...but if we've already gone through all the params
+				#add merely a zero.
+				except IndexError:
+					self.paramVals.append(0)
+			#If the length of the string we've appended every entered parameter to is four,
 			if len(self.paramVals) == 4:
+				#record that it is so.
 				self.paramsfilled = True
 		else:
 			print("==================================")
@@ -790,33 +1020,57 @@ class LumaSetting(object):
 			for i in range(4):
 				self.paramVals.append(0)
 		
-	
-	#Returns whether or not the parameter collection dialog has been completed.
+
 	def gottenParams(self):
+	"""
+	Returns whether or not the parameter collection dialog has been completed.
+	"""
 		return self.paramsfilled
 	
-	#Returns the name of this LumaSetting.
+
 	def getName(self):
+	"""
+	Returns the name of this LumaSetting.
+	"""
 		return self.name
 	
-	#Returns the numerical value of this LumaSetting.
+
 	def getVal(self):
+	"""
+	Returns the numerical value of this LumaSetting.
+	"""
 		return self.value
 	
-	#Returns the list of parameter names.
+
 	def getParamNameList(self):
+	"""
+	Returns the list of parameter names.
+	"""
 		return self.params
 		
-	#Returns the list of parameter values.
+
 	def getParamValList(self):
+	"""
+	Returns the list of parameter values.
+	"""
 		return self.paramVals
 
 
-#Main program definition.
 def main():
+	"""
+	Main program definition. Simply creates an instance of the
+	Luma class, and never stops running it.
+	"""
+	
+	#Pass in the names of the config files.
+	#.lcf = Luma Config File.
 	script = Luma("places.lcf","patterns.lcf","presets.lcf")
+	
+	#Never stop running the script. The program is exited by
+	#the user.
 	while(True):
 		script.handle()
-		
+
+#execute the program.		
 main()
 
